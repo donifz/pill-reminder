@@ -7,6 +7,12 @@ import { PlusIcon } from '@heroicons/react/24/outline';
 import { medicationsApi, Medication } from './services/api';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 
+interface ToggleParams {
+  id: string;
+  date: string;
+  time: string;
+}
+
 export default function Home() {
   const [showAddForm, setShowAddForm] = useState(false);
   const queryClient = useQueryClient();
@@ -20,11 +26,14 @@ export default function Home() {
     },
   });
 
-  const toggleMutation = useMutation(medicationsApi.toggleTaken, {
-    onSuccess: () => {
-      queryClient.invalidateQueries('medications');
-    },
-  });
+  const toggleMutation = useMutation(
+    (params: ToggleParams) => medicationsApi.toggleTaken(params.id, params.date, params.time),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('medications');
+      },
+    }
+  );
 
   const deleteMutation = useMutation(medicationsApi.delete, {
     onSuccess: () => {
@@ -35,7 +44,7 @@ export default function Home() {
   const handleAddMedication = (data: {
     name: string;
     dose: string;
-    time: string;
+    times: string[];
     duration: number;
     startDate: string;
     endDate: string;
@@ -44,7 +53,14 @@ export default function Home() {
   };
 
   const handleTakeMedication = (id: string) => {
-    toggleMutation.mutate(id);
+    const today = new Date().toISOString().split('T')[0];
+    const medication = medications.find(m => m.id === id);
+    if (!medication) return;
+
+    const currentTime = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+    const nextTime = medication.times.find(time => time >= currentTime) || medication.times[0];
+    
+    toggleMutation.mutate({ id, date: today, time: nextTime });
   };
 
   const handleDeleteMedication = (id: string) => {
@@ -86,7 +102,7 @@ export default function Home() {
               id={medication.id}
               name={medication.name}
               dose={medication.dose}
-              time={medication.time}
+              times={medication.times}
               taken={medication.taken}
               onTake={() => handleTakeMedication(medication.id)}
               onDelete={() => handleDeleteMedication(medication.id)}

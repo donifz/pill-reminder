@@ -8,12 +8,12 @@ export interface Medication {
   id: string;
   name: string;
   dose: string;
-  time: string;
+  times: string[];
   duration: number;
   taken: boolean;
   startDate: string;
   endDate: string;
-  takenDates: string[];
+  takenDates: { date: string; times: string[] }[];
   createdAt: string;
   updatedAt: string;
 }
@@ -34,8 +34,8 @@ export const medicationsApi = {
     return response.data;
   },
 
-  toggleTaken: async (id: string) => {
-    const response = await api.patch<Medication>(`/medications/${id}/toggle`);
+  toggleTaken: async (id: string, date: string, time: string) => {
+    const response = await api.patch<Medication>(`/medications/${id}/toggle`, { date, time });
     return response.data;
   },
 

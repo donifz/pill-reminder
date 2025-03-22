@@ -5,7 +5,7 @@ interface MedicationCardProps {
   id: string;
   name: string;
   dose: string;
-  time: string;
+  times: string[];
   taken: boolean;
   onTake: () => void;
   onDelete: () => void;
@@ -15,7 +15,7 @@ export const MedicationCard = ({
   id,
   name,
   dose,
-  time,
+  times,
   taken,
   onTake,
   onDelete,
@@ -39,9 +39,13 @@ export const MedicationCard = ({
           <div>
             <h3 className="text-lg font-medium text-gray-900 hover:text-blue-600">{name}</h3>
             <p className="text-sm text-gray-500">{dose}</p>
-            <div className="flex items-center mt-2">
-              <ClockIcon className="h-4 w-4 text-gray-400 mr-1" />
-              <span className="text-sm text-gray-500">{formatTime(time)}</span>
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              {times.map((time, index) => (
+                <div key={index} className="flex items-center bg-gray-100 px-2 py-1 rounded-md">
+                  <ClockIcon className="h-4 w-4 text-gray-400 mr-1" />
+                  <span className="text-sm text-gray-500">{formatTime(time)}</span>
+                </div>
+              ))}
             </div>
           </div>
         </Link>
