@@ -79,7 +79,7 @@ export default function Home() {
     <main className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-2xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-semibold text-gray-900">Medication Tracker</h1>
+          <h1 className="text-2xl font-semibold text-gray-900"></h1>
           <button
             onClick={() => setShowAddForm(!showAddForm)}
             className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
