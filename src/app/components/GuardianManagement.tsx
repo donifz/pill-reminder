@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { guardianApi, Guardian } from '../services/guardian';
-import { List, Card, message, Modal, Typography, Tag, Spin, Button, Space } from 'antd';
-import { ClockCircleOutlined, CheckOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { List, Card, message, Modal, Typography, Tag, Spin, Button, Space, Form, Input } from 'antd';
+import { ClockCircleOutlined, CheckOutlined, ExclamationCircleOutlined, UserAddOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { AxiosError } from 'axios';
 import { useAuth } from '../hooks/useAuth';
@@ -12,7 +12,9 @@ export const GuardianManagement: React.FC = () => {
   const queryClient = useQueryClient();
   const { loading: authLoading } = useAuth();
   const [isAcceptModalVisible, setIsAcceptModalVisible] = useState(false);
+  const [isInviteModalVisible, setIsInviteModalVisible] = useState(false);
   const [selectedGuardian, setSelectedGuardian] = useState<Guardian | null>(null);
+  const [form] = Form.useForm();
 
   const { data: guardians = [], isLoading: guardiansLoading } = useQuery<Guardian[]>(
     'guardians-for',
@@ -21,6 +23,19 @@ export const GuardianManagement: React.FC = () => {
       initialData: []
     }
   );
+
+  const inviteMutation = useMutation(guardianApi.inviteGuardian, {
+    onSuccess: () => {
+      message.success('Invitation sent successfully');
+      setIsInviteModalVisible(false);
+      form.resetFields();
+      queryClient.invalidateQueries('guardians-for');
+    },
+    onError: (error: AxiosError<{ message: string }>) => {
+      console.error('Invite guardian error:', error);
+      message.error(error.response?.data?.message || 'Failed to send invitation');
+    },
+  });
 
   const acceptMutation = useMutation(guardianApi.acceptInvitation, {
     onSuccess: () => {
@@ -51,6 +66,14 @@ export const GuardianManagement: React.FC = () => {
     }
   };
 
+  const handleInvite = async (values: { email: string }) => {
+    try {
+      await inviteMutation.mutateAsync(values.email);
+    } catch {
+      // Error is already handled by the mutation
+    }
+  };
+
   if (authLoading || guardiansLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -66,8 +89,19 @@ export const GuardianManagement: React.FC = () => {
     <div className="space-y-6">
       <Card className="shadow-sm">
         <div className="mb-6">
-          <Title level={3} className="!mb-0">Guardian Invitations</Title>
-          <Text type="secondary">Invitations from users who want you to be their guardian</Text>
+          <div className="flex justify-between items-center">
+            <div>
+              <Title level={3} className="!mb-0">Guardian Invitations</Title>
+              <Text type="secondary">Invitations from users who want you to be their guardian</Text>
+            </div>
+            <Button
+              type="primary"
+              icon={<UserAddOutlined />}
+              onClick={() => setIsInviteModalVisible(true)}
+            >
+              Invite Guardian
+            </Button>
+          </div>
         </div>
 
         <div className="space-y-8">
@@ -121,6 +155,7 @@ export const GuardianManagement: React.FC = () => {
         </div>
       </Card>
 
+      {/* Accept Invitation Modal */}
       <Modal
         title={
           <Space>
@@ -165,6 +200,56 @@ export const GuardianManagement: React.FC = () => {
             </div>
           )}
         </div>
+      </Modal>
+
+      {/* Invite Guardian Modal */}
+      <Modal
+        title={
+          <Space>
+            <UserAddOutlined className="text-blue-500" />
+            <span>Invite a Guardian</span>
+          </Space>
+        }
+        open={isInviteModalVisible}
+        onCancel={() => {
+          setIsInviteModalVisible(false);
+          form.resetFields();
+        }}
+        footer={null}
+      >
+        <Form
+          form={form}
+          onFinish={handleInvite}
+          layout="vertical"
+        >
+          <Form.Item
+            label="Email Address"
+            name="email"
+            rules={[
+              { required: true, message: 'Please enter an email address' },
+              { type: 'email', message: 'Please enter a valid email address' }
+            ]}
+          >
+            <Input placeholder="Enter the email address of the guardian" />
+          </Form.Item>
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={() => {
+                setIsInviteModalVisible(false);
+                form.resetFields();
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={inviteMutation.isLoading}
+            >
+              Send Invitation
+            </Button>
+          </div>
+        </Form>
       </Modal>
     </div>
   );
