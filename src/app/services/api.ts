@@ -20,11 +20,25 @@ export interface Medication {
     updatedAt: string;
 }
 
+export interface User {
+    id: string;
+    name: string;
+    email: string;
+}
+
+export interface MedicationsResponse {
+    userMedications: Medication[];
+    guardianMedications: {
+        user: User;
+        medications: Medication[];
+    }[];
+}
+
 export const medicationsApi = {
     getAll: async () => {
         const token = Cookies.get("token");
 
-        const response = await api.get<Medication[]>("/medications", {
+        const response = await api.get<MedicationsResponse>("/medications", {
             headers: {
                 Authorization: `Bearer ${token}`,
             },
@@ -54,11 +68,21 @@ export const medicationsApi = {
     },
 
     toggleTaken: async (id: string, date: string, time: string) => {
-        const response = await api.patch<Medication>(`/medications/${id}/toggle`, { date, time });
+        const token = Cookies.get("token");
+        const response = await api.patch<Medication>(`/medications/${id}/toggle`, { date, time }, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
         return response.data;
     },
 
     delete: async (id: string) => {
-        await api.delete(`/medications/${id}`);
+        const token = Cookies.get("token");
+        await api.delete(`/medications/${id}`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
     },
 };
