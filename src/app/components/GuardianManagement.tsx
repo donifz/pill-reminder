@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { guardianApi, Guardian } from '../services/guardian';
-import { List, Card, message, Modal, Typography, Tag, Spin, Button, Space, Form, Input } from 'antd';
-import { ClockCircleOutlined, CheckOutlined, ExclamationCircleOutlined, UserAddOutlined } from '@ant-design/icons';
+import { List, Card, message, Modal, Typography, Tag, Spin, Button, Space, Form, Input, Tabs } from 'antd';
+import { ClockCircleOutlined, CheckOutlined, ExclamationCircleOutlined, UserAddOutlined, SendOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { AxiosError } from 'axios';
 import { useAuth } from '../hooks/useAuth';
 
 const { Title, Text } = Typography;
+const { TabPane } = Tabs;
 
 export const GuardianManagement: React.FC = () => {
   const queryClient = useQueryClient();
@@ -16,7 +17,7 @@ export const GuardianManagement: React.FC = () => {
   const [selectedGuardian, setSelectedGuardian] = useState<Guardian | null>(null);
   const [form] = Form.useForm();
 
-  const { data: guardians = [], isLoading: guardiansLoading } = useQuery<Guardian[]>(
+  const { data: receivedGuardians = [], isLoading: receivedGuardiansLoading } = useQuery<Guardian[]>(
     'guardians-for',
     guardianApi.getGuardianFor,
     {
@@ -24,11 +25,24 @@ export const GuardianManagement: React.FC = () => {
     }
   );
 
+  const { data: sentGuardians = [], isLoading: sentGuardiansLoading } = useQuery<Guardian[]>(
+    'guardians',
+    guardianApi.getGuardians,
+    {
+      initialData: [],
+      refetchOnMount: true,
+      refetchOnWindowFocus: true,
+    }
+  );
+
   const inviteMutation = useMutation(guardianApi.inviteGuardian, {
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Invitation sent successfully:', data);
       message.success('Invitation sent successfully');
       setIsInviteModalVisible(false);
       form.resetFields();
+      // Force refetch both queries
+      queryClient.invalidateQueries('guardians');
       queryClient.invalidateQueries('guardians-for');
     },
     onError: (error: AxiosError<{ message: string }>) => {
@@ -39,7 +53,7 @@ export const GuardianManagement: React.FC = () => {
 
   const acceptMutation = useMutation(guardianApi.acceptInvitation, {
     onSuccess: () => {
-      queryClient.invalidateQueries('guardians-for');
+      queryClient.invalidateQueries(['guardians-for', 'guardians']);
       message.success('Invitation accepted successfully');
       setIsAcceptModalVisible(false);
       setSelectedGuardian(null);
@@ -74,7 +88,7 @@ export const GuardianManagement: React.FC = () => {
     }
   };
 
-  if (authLoading || guardiansLoading) {
+  if (authLoading || receivedGuardiansLoading || sentGuardiansLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <Spin size="large" />
@@ -82,8 +96,66 @@ export const GuardianManagement: React.FC = () => {
     );
   }
 
-  // Filter guardians to show only pending invitations for the current user
-  const pendingGuardians = guardians.filter(g => !g.isAccepted);
+  // Filter guardians to show only pending invitations
+  const pendingReceivedGuardians = receivedGuardians.filter(g => !g.isAccepted);
+  const pendingSentGuardians = sentGuardians.filter(g => !g.isAccepted);
+
+  console.log('Pending sent guardians:', pendingSentGuardians);
+  console.log('All sent guardians:', sentGuardians);
+
+  const renderGuardianList = (guardians: Guardian[], isReceived: boolean = false) => {
+    if (guardians.length === 0) {
+      return (
+        <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
+          <p className="text-lg">No pending invitations</p>
+        </div>
+      );
+    }
+
+    return (
+      <List
+        dataSource={guardians}
+        renderItem={(guardian: Guardian) => (
+          <List.Item
+            actions={isReceived ? [
+              <Button
+                key="accept"
+                type="primary"
+                icon={<CheckOutlined />}
+                onClick={() => handleAccept(guardian)}
+                loading={acceptMutation.isLoading}
+              >
+                Accept
+              </Button>,
+            ] : undefined}
+          >
+            <List.Item.Meta
+              avatar={<ClockCircleOutlined className="text-2xl text-orange-500" />}
+              title={
+                <div className="flex items-center gap-2">
+                  {isReceived ? `Guardian Request from ${guardian.user?.name}` : `Invitation sent to ${guardian.guardian?.email || 'Pending'}`}
+                  <Tag color="orange">Pending</Tag>
+                </div>
+              }
+              description={
+                <div>
+                  <div className="text-sm text-gray-500">
+                    {isReceived ? `From: ${guardian.user?.email}` : `To: ${guardian.guardian?.email || 'Pending'}`}
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    {isReceived ? 'Invited on: ' : 'Sent on: '}{new Date(guardian.createdAt).toLocaleDateString()}
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    Expires: {new Date(guardian.invitationExpiresAt).toLocaleDateString()}
+                  </div>
+                </div>
+              }
+            />
+          </List.Item>
+        )}
+      />
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -91,8 +163,8 @@ export const GuardianManagement: React.FC = () => {
         <div className="mb-6">
           <div className="flex justify-between items-center">
             <div>
-              <Title level={3} className="!mb-0">Guardian Invitations</Title>
-              <Text type="secondary">Invitations from users who want you to be their guardian</Text>
+              <Title level={3} className="!mb-0">Guardian Management</Title>
+              <Text type="secondary">Manage your guardian relationships and invitations</Text>
             </div>
             <Button
               type="primary"
@@ -104,55 +176,30 @@ export const GuardianManagement: React.FC = () => {
           </div>
         </div>
 
-        <div className="space-y-8">
-          {pendingGuardians.length > 0 ? (
-            <List
-              dataSource={pendingGuardians}
-              renderItem={(guardian: Guardian) => (
-                <List.Item
-                  actions={[
-                    <Button
-                      key="accept"
-                      type="primary"
-                      icon={<CheckOutlined />}
-                      onClick={() => handleAccept(guardian)}
-                      loading={acceptMutation.isLoading}
-                    >
-                      Accept
-                    </Button>,
-                  ]}
-                >
-                  <List.Item.Meta
-                    avatar={<ClockCircleOutlined className="text-2xl text-orange-500" />}
-                    title={
-                      <div className="flex items-center gap-2">
-                        Guardian Request from {guardian.user?.name}
-                        <Tag color="orange">Pending</Tag>
-                      </div>
-                    }
-                    description={
-                      <div>
-                        <div className="text-sm text-gray-500">
-                          From: {guardian.user?.email}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          Invited on: {new Date(guardian.createdAt).toLocaleDateString()}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          Expires: {new Date(guardian.invitationExpiresAt).toLocaleDateString()}
-                        </div>
-                      </div>
-                    }
-                  />
-                </List.Item>
-              )}
-            />
-          ) : (
-            <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
-              <p className="text-lg">No pending invitations</p>
-            </div>
-          )}
-        </div>
+        <Tabs defaultActiveKey="received">
+          <TabPane
+            tab={
+              <span>
+                <ClockCircleOutlined />
+                Received Invitations
+              </span>
+            }
+            key="received"
+          >
+            {renderGuardianList(pendingReceivedGuardians, true)}
+          </TabPane>
+          <TabPane
+            tab={
+              <span>
+                <SendOutlined />
+                Sent Invitations
+              </span>
+            }
+            key="sent"
+          >
+            {renderGuardianList(pendingSentGuardians)}
+          </TabPane>
+        </Tabs>
       </Card>
 
       {/* Accept Invitation Modal */}

@@ -5,20 +5,19 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export interface Guardian {
     id: string;
+    userId: string;
+    guardianId: string;
     isAccepted: boolean;
     invitationToken: string;
-    invitationExpiresAt: Date;
-    createdAt: Date;
-    updatedAt: Date;
-    guardian: {
+    invitationExpiresAt: string;
+    createdAt: string;
+    updatedAt: string;
+    user?: {
         id: string;
         name: string;
         email: string;
-        password?: string;
-        createdAt?: string;
-        updatedAt?: string;
     };
-    user: {
+    guardian?: {
         id: string;
         name: string;
         email: string;
@@ -103,8 +102,7 @@ const guardianApi = {
                 Authorization: `Bearer ${token}`,
             },
         });
-        console.log(response.data,"response.data================================");
-        
+        console.log('getGuardians response:', response.data);
         return response.data;
     },
 
